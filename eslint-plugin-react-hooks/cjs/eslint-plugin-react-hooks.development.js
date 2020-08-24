@@ -904,7 +904,7 @@ var ExhaustiveDeps = {
 
       reportProblem({
         node: reactiveHook,
-        message: "(custom) React Hook " + reactiveHookName + " has a missing dependency: '" + callback.name + "'. " + "Either include it or remove the dependency array (custom message).",
+        message: "React Hook " + reactiveHookName + " has a missing dependency: '" + callback.name + "'. " + "Either include it or remove the dependency array.",
         suggest: [{
           desc: "Update the dependencies array to be: [" + callback.name + "]",
           fix: function (fixer) {
@@ -2247,6 +2247,15 @@ function analyzePropertyChain(node, optionalChains) {
     }
 
     return _result2;
+  } else if (node.type === 'ChainExpression' && !node.computed) {
+    var _result3 = analyzePropertyChain(node.expression, optionalChains);
+
+    if (optionalChains) {
+      // Mark as required.
+      optionalChains.set(_result3, false);
+    }
+
+    return _result3;
   } else {
     throw new Error("Unsupported node type: " + node.type);
   }
