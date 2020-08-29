@@ -3,6 +3,7 @@ import logo from "./logo.svg";
 import "./App.css";
 
 function MyComponent() {
+  console.warn("Oh no");
   const x = Date.now() % 2 === 0 ? { test: true } : undefined;
   React.useEffect(() => {
     if (x?.test) {
@@ -11,6 +12,12 @@ function MyComponent() {
   }, [x?.test]);
   return <div>My Component Test</div>;
 }
+
+// function useHook({ bar }) {
+//   let foo1 = bar && React.useState();
+//   let foo2 = bar || React.useState();
+//   let foo3 = bar ?? React.useState();
+// }
 
 function App() {
   return (

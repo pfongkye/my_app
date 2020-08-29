@@ -1068,6 +1068,14 @@ var ExhaustiveDeps = {
               return false;
             }
           }
+        } else if (name === 'useTransition') {
+          if (id.type === 'ArrayPattern' && Array.isArray(resolved.identifiers)) {
+            // Is first tuple value the same reference we're checking?
+            if (id.elements[0] === resolved.identifiers[0]) {
+              // Setter is stable.
+              return true;
+            }
+          }
         } // By default assume it's dynamic.
 
 
@@ -1449,8 +1457,8 @@ var ExhaustiveDeps = {
 
           var maybeID = declaredDependencyNode;
 
-          while (maybeID.type === 'MemberExpression' || maybeID.type === 'OptionalMemberExpression') {
-            maybeID = maybeID.object;
+          while (maybeID.type === 'MemberExpression' || maybeID.type === 'OptionalMemberExpression' || maybeID.type === 'ChainExpression') {
+            maybeID = maybeID.object || maybeID.expression.object;
           }
 
           var isDeclaredInComponent = !componentScope.through.some(function (ref) {
@@ -2193,6 +2201,28 @@ function getDependency(node) {
   }
 }
 /**
+ * Mark a node as either optional or required.
+ * Note: If the node argument is an OptionalMemberExpression, it doesn't necessarily mean it is optional.
+ * It just means there is an optional member somewhere inside.
+ * This particular node might still represent a required member, so check .optional field.
+ */
+
+
+function markNode(node, optionalChains, result) {
+  if (optionalChains) {
+    if (node.optional) {
+      // We only want to consider it optional if *all* usages were optional.
+      if (!optionalChains.has(result)) {
+        // Mark as (maybe) optional. If there's a required usage, this will be overridden.
+        optionalChains.set(result, true);
+      }
+    } else {
+      // Mark as required.
+      optionalChains.set(result, false);
+    }
+  }
+}
+/**
  * Assuming () means the passed node.
  * (foo) -> 'foo'
  * foo(.)bar -> 'foo.bar'
@@ -2217,11 +2247,7 @@ function analyzePropertyChain(node, optionalChains) {
 
     var _result = object + "." + property;
 
-    if (optionalChains) {
-      // Mark as required.
-      optionalChains.set(_result, false);
-    }
-
+    markNode(node, optionalChains, _result);
     return _result;
   } else if (node.type === 'OptionalMemberExpression' && !node.computed) {
     var _object = analyzePropertyChain(node.object, optionalChains);
@@ -2230,31 +2256,18 @@ function analyzePropertyChain(node, optionalChains) {
 
     var _result2 = _object + "." + _property;
 
-    if (optionalChains) {
-      // Note: OptionalMemberExpression doesn't necessarily mean this node is optional.
-      // It just means there is an optional member somewhere inside.
-      // This particular node might still represent a required member, so check .optional field.
-      if (node.optional) {
-        // We only want to consider it optional if *all* usages were optional.
-        if (!optionalChains.has(_result2)) {
-          // Mark as (maybe) optional. If there's a required usage, this will be overridden.
-          optionalChains.set(_result2, true);
-        }
-      } else {
-        // Mark as required.
-        optionalChains.set(_result2, false);
-      }
-    }
-
+    markNode(node, optionalChains, _result2);
     return _result2;
   } else if (node.type === 'ChainExpression' && !node.computed) {
-    var _result3 = analyzePropertyChain(node.expression, optionalChains);
+    var expression = node.expression;
 
-    if (optionalChains) {
-      // Mark as required.
-      optionalChains.set(_result3, false);
-    }
+    var _object2 = analyzePropertyChain(expression.object, optionalChains);
 
+    var _property2 = analyzePropertyChain(expression.property, null);
+
+    var _result3 = _object2 + "." + _property2;
+
+    markNode(expression, optionalChains, _result3);
     return _result3;
   } else {
     throw new Error("Unsupported node type: " + node.type);
